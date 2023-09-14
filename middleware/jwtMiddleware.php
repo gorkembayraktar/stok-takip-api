@@ -29,6 +29,8 @@ $jwtMiddleware = function (Request $request, RequestHandler $handler) use ($jwtS
         $decoded = JWT::decode($token, $jwtSettings['secret'], [$jwtSettings['algorithm']]);
         // JWT token doğrulaması başarılı, devam et
         $request = $request->withAttribute('user', $decoded);
+
+      
         $response = $handler->handle($request);
 
         return $response;

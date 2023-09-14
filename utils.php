@@ -3,6 +3,7 @@
 
 use Firebase\JWT\JWT;
 use Slim\Psr7\Response;
+use Slim\Psr7\Request;
 
 $config = include( BASEAPP .'/config/settings.php');
 $jwtSettings = $config['jwtSettings'];
@@ -48,4 +49,15 @@ function hash_pass($pasword){
 
 function check_pass($password, $hash){
    return password_verify($password, $hash);
+}
+
+function parse_body(Request $request){
+    $contentType = $request->getHeaderLine('Content-Type');
+    if ($contentType === 'application/json') {
+        $data = file_get_contents('php://input');
+        $data = json_decode($data, true);
+    }else{
+        $data = $request->getParsedBody();
+    }
+    return $data;
 }

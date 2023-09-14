@@ -5,6 +5,12 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Psr7\Response;
 
 
+header('Access-Control-Allow-Origin: *'); 
+header("Access-Control-Allow-Credentials: true");
+header('Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS');
+header('Access-Control-Max-Age: 1000');
+header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token , Authorization');
+
 define('BASEAPP', __DIR__);
 
 require BASEAPP . '/vendor/autoload.php';
@@ -21,11 +27,12 @@ $app->setBasePath("/stok-takip/api");
 
 
 $app->post('/login', function (Request $request, Response $response) {
-    $data = $request->getParsedBody();
+
+    $data = parse_body($request);
 
     // Kullanıcı adı ve şifre doğrulamasını yapın
-    $username = $data['username'];
-    $password = $data['password'];
+    $username = isset($data['username']) ? $data['username'] : '';
+    $password = isset($data['username']) ? $data['password'] : '';
 
     $db = $this->get('db');
 
@@ -38,8 +45,12 @@ $app->post('/login', function (Request $request, Response $response) {
             'username' =>  $user->username,
             'exp' => time() + (60 * 60 * 24), // 24 saatlik geçerlilik süresi
         ];
+        $user = [
+            "id" => $user->id,
+            "username" => $user->username,
+        ];
         $token = jwt_encode($payload);
-        return respondWithJson($response, ['token' => $token], 401);
+        return respondWithJson($response, ['token' => $token, 'user' => $user], 200);
     } else {
        return respondWithJson($response, ['error' => 'Authentication failed'], 401);
     }
