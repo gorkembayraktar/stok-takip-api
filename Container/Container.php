@@ -13,7 +13,7 @@ $container->set('db', function () use ($config) {
     $capsule = new Capsule;
 
     // Burada veritabanı yapılandırmasını yapmalısınız
-    $capsule->addConnection($config);
+    $capsule->addConnection($config['db']);
     $capsule->setAsGlobal();
     $capsule->bootEloquent();
 

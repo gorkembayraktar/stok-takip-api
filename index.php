@@ -1,24 +1,17 @@
 <?php
 use Slim\Factory\AppFactory;
 
-use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Psr7\Response;
 
-use Firebase\JWT\JWT;
 
 define('BASEAPP', __DIR__);
 
 require BASEAPP . '/vendor/autoload.php';
 require BASEAPP . '/Container/Container.php';
 require BASEAPP . '/utils.php';
+require BASEAPP . '/middleware/jwtMiddleware.php';
 
-// JWT ayarlarını yapılandırın (örnek)
-$jwtSettings = [
-    'secret' => 'a21o21o2o12o1-fsakfafk-m2121', // Gizli anahtarınızı buraya ekleyin
-    'algorithm' => 'HS256', // Kullanmak istediğiniz JWT algoritması
-    'expires' => '1 hour', // Token'ın süresi
-];
 
 
 $app = AppFactory::create();
@@ -27,58 +20,32 @@ $app->addErrorMiddleware(true, true, true);
 $app->setBasePath("/stok-takip/api");
 
 
-$app->post('/login', function (Request $request, Response $response) use ($jwtSettings) {
+$app->post('/login', function (Request $request, Response $response) {
     $data = $request->getParsedBody();
 
-    // Kullanıcı adı ve şifre doğrulamasını yapın (örnek)
+    // Kullanıcı adı ve şifre doğrulamasını yapın
     $username = $data['username'];
     $password = $data['password'];
 
+    $db = $this->get('db');
+
+    $user = $db->table('user')->where('username', $username)->first();
+
     // Kullanıcı doğrulama başarılıysa, JWT token üretin
-    if ($username === 'demo' && $password === 'password') {
+    if ($user && check_pass($password, $user->password)) {
         $payload = [
-            'sub' => 1,
-            'username' => $username,
+            'sub' =>  $user->id,
+            'username' =>  $user->username,
             'exp' => time() + (60 * 60 * 24), // 24 saatlik geçerlilik süresi
         ];
-
-        $token = JWT::encode($payload, $jwtSettings['secret'], $jwtSettings['algorithm']);
-
+        $token = jwt_encode($payload);
         return respondWithJson($response, ['token' => $token], 401);
     } else {
        return respondWithJson($response, ['error' => 'Authentication failed'], 401);
     }
 });
 
-// JWT doğrulama middleware'i
-$jwtMiddleware = function (Request $request, RequestHandler $handler) use ($jwtSettings) {
 
-
-  
-    $tokenHeader = $request->getHeader('Authorization');
-
-    if (empty($tokenHeader) || !preg_match('/Bearer (.+)/', $tokenHeader[0], $matches)) {
-        return newRespondWithJson(['error' => 'Token not provided'], 401);
-    }
- 
-    $token = $matches[1];
-
-    if (!$token) {
-        return newRespondWithJson(['error' => 'Token not provided'], 401);
-    }
-
-    try {
-        $decoded = JWT::decode($token, $jwtSettings['secret'], [$jwtSettings['algorithm']]);
-        // JWT token doğrulaması başarılı, devam et
-        $request = $request->withAttribute('user', $decoded);
-        $response = $handler->handle($request);
-
-        return $response;
-    } catch (\Exception $e) {
-        // JWT token doğrulaması başarısız
-        return newRespondWithJson(['error' => 'Authentication failed', 'message' => $e->getMessage()], 401);
-    }
-};
 
 $app->group('', function ($group)  {
 
