@@ -19,11 +19,12 @@ require BASEAPP . '/utils.php';
 require BASEAPP . '/middleware/jwtMiddleware.php';
 
 
+$config = include(BASEAPP . '/config/settings.php');
 
 $app = AppFactory::create();
 
 $app->addErrorMiddleware(true, true, true);
-$app->setBasePath("/stok-takip/api");
+$app->setBasePath( $config['basePath'] );
 
 
 $app->post('/login', function (Request $request, Response $response) {
@@ -148,6 +149,7 @@ $app->group('', function ($group)  {
 
     function get_list_with_id( $db, int $args_id  ){
         $item = $db->table('list')->where('is_deleted', false)->where("id", $args_id)->first();
+        if(!$item) return (object)[];
         $item->items = [];
 
         $ids = $db->table('list_variants')
@@ -274,11 +276,55 @@ $app->group('', function ($group)  {
          'stock' => intval($data['stock']) ]);
         return respondWithJson($response, [], 200);
     });
+
     $group->delete('/variant/{id:[0-9]+}', function (Request $request, Response $response, $args) {
         $db = $this->get('db');
         $s = $db->table('variants')->where('id', $args['id'])->update(['is_deleted' => true]);
         return respondWithJson($response, [], $s ? 200 : 500);
     });
+
+   // update
+   $group->post('/calculate', function (Request $request, Response $response, $args) {
+        $data = parse_body($request);
+        $db = $this->get('db');
+
+        if(!$data){
+            return respondWithJson($response, ["message" => 'Uncorrect data'], 400);
+        }
+
+        foreach($data as $list){
+
+            $get_list_data = get_list_with_id($db, $list['id']);
+
+            if($get_list_data && property_exists( $get_list_data , 'items')){
+
+                foreach($get_list_data->items as $item){
+
+                
+                    foreach($item['variants'] as $variant){
+                    
+                        $db->table('variants')->where('id', $variant->id)->decrement('stock', $variant->total * $list['total']);
+                        $db->table('variants_stock_decrement')->insert([
+                            'variant_id' => $variant->id,
+                            'stock' => $db->table('variants')->where('id', $variant->id)->first()->stock,
+                            'decrement' => $variant->total * $list['total']
+                        ]);
+                    }
+                }
+            }
+            $i = $db->table('calculate')->insert([
+                'list_id' => $list['id'],
+                'list_data' => json_encode($get_list_data),
+                'total' => $list['total']
+            ]);
+
+        }
+
+        return respondWithJson($response, []);
+        
+    });
+
+
 
 })->add($jwtMiddleware);
 

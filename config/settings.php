@@ -1,6 +1,7 @@
 <?php
 // Database settings
 return [
+    "basePath" => "/stok-takip/api",
     "jwtSettings" => [
         'secret' => 'a21o21o2o12o1-fsakfafk-m2121', // Gizli anahtarınızı buraya ekleyin
         'algorithm' => 'HS256', // Kullanmak istediğiniz JWT algoritması
