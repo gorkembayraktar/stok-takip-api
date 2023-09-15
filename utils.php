@@ -16,7 +16,7 @@ function respondWithJson(Response $response, $data, $statusCode = 200) {
         "data" => $data
     ];
 
-    $response->getBody()->write(json_encode($out));
+    $response->getBody()->write(json_encode($out,JSON_NUMERIC_CHECK));
 
     return $response
         ->withHeader('Content-Type', 'application/json')
@@ -30,9 +30,12 @@ function newRespondWithJson($data, $statusCode = 200){
         "data" => $data
     ];
 
-    $response->getBody()->write(json_encode($out));
+    $response->getBody()->write(json_encode($out, JSON_NUMERIC_CHECK));
     return $response
     ->withHeader('Content-Type', 'application/json')
+    ->withHeader('Access-Control-Allow-Origin', '*')
+    ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Accept, Origin, Content-Type, Authorization')
+    ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
     ->withStatus($statusCode);
 }
 

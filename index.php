@@ -1,15 +1,12 @@
 <?php
 use Slim\Factory\AppFactory;
-
+use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Psr7\Response;
+use Psr\Http\Server\RequestHandlerInterface;
+use Slim\Exception\HttpNotFoundException;
+use Slim\Routing\RouteContext;
 
-
-header('Access-Control-Allow-Origin: *'); 
-header("Access-Control-Allow-Credentials: true");
-header('Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS');
-header('Access-Control-Max-Age: 1000');
-header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token , Authorization');
 
 define('BASEAPP', __DIR__);
 
@@ -23,11 +20,43 @@ $config = include(BASEAPP . '/config/settings.php');
 
 $app = AppFactory::create();
 
+
 $app->addErrorMiddleware(true, true, true);
 $app->setBasePath( $config['basePath'] );
 
 
+// CORS middleware
+$app->options('/{routes:.+}', function ($request, $response, $args) {
+    return $response;
+});
+
+$app->addBodyParsingMiddleware();
+
+// This middleware will append the response header Access-Control-Allow-Methods with all allowed methods
+$app->add(function (Request $request, RequestHandlerInterface $handler): Response {
+    $routeContext = RouteContext::fromRequest($request);
+    $routingResults = $routeContext->getRoutingResults();
+    $methods = $routingResults->getAllowedMethods();
+    $requestHeaders = $request->getHeaderLine('Access-Control-Request-Headers');
+
+    $response = $handler->handle($request);
+
+    $response = $response->withHeader('Access-Control-Allow-Origin', '*');
+    $response = $response->withHeader('Access-Control-Allow-Methods', implode(',', $methods));
+    $response = $response->withHeader('Access-Control-Allow-Headers', $requestHeaders);
+
+    // Optional: Allow Ajax CORS requests with Authorization header
+    //$response = $response->withHeader('Access-Control-Allow-Credentials', 'true');
+
+    return $response;
+});
+
+
+// The RoutingMiddleware should be added after our CORS middleware so routing is performed first
+$app->addRoutingMiddleware();
+
 $app->post('/login', function (Request $request, Response $response) {
+
 
     $data = parse_body($request);
 
@@ -329,6 +358,9 @@ $app->group('', function ($group)  {
 })->add($jwtMiddleware);
 
 
+$app->map(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], '/{routes:.+}', function ($request, $response) {
+    throw new HttpNotFoundException($request);
+});
 
 
 
