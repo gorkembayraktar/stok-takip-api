@@ -83,7 +83,7 @@ $app->group('', function ($group)  {
 
     $group->post('/product/create', function (Request $request, Response $response, $args) {
         $db = $this->get('db');
-        $data = $request->getParsedBody();
+        $data = parse_body($request);
 
         $insert = [
             "title" => $data['title']
@@ -96,8 +96,9 @@ $app->group('', function ($group)  {
     });
     // product update
     $group->post('/product/{id:[0-9]+}', function (Request $request, Response $response, $args) {
+        
         $db = $this->get('db');
-        $data = $request->getParsedBody();
+        $data = parse_body($request);
         $s = $db->table('products')
         ->where('is_deleted', false)
         ->where('id', $args['id'])->update([
@@ -131,6 +132,7 @@ $app->group('', function ($group)  {
                     ->leftJoin('variants', 'list_variants.variant_id', '=', 'variants.id')
                     ->where('list_variants.product_id', $id)
                     ->where('variants.is_deleted', false)
+                    ->where('list_variants.list_id', $item->id)
                     ->get()
                 ];
             }
@@ -173,11 +175,9 @@ $app->group('', function ($group)  {
 
         $db = $this->get('db');
 
-        $data = $request->getParsedBody();
+        $data = parse_body($request);
 
         $list_id = $db->table('list')->insertGetId(['title' => $data['title']]);
-
-        $data['items'] = json_decode($data['items'], true);
 
         foreach($data['items'] as $item){
             foreach($item['variants'] as $variant){
@@ -199,11 +199,52 @@ $app->group('', function ($group)  {
         }
         return respondWithJson($response, get_list_with_id($db, $list_id));
     });
+   $group->post('/list/{id:[0-9]+}', function (Request $request, Response $response, $args) {
 
+        $db = $this->get('db');
+
+        $data = parse_body($request);
+
+        $db->table('list')->
+        where('id', $args['id'])->
+        update(['title' => $data['title']]);
+
+        $db->table('list_variants')->where('list_id', $args['id'])->delete();
+
+      
+        $list_id = $args['id'];
+        
+        foreach($data['items'] as $item){
+            foreach($item['variants'] as $variant){
+                if(
+                    $variant['id'] &&
+                    $db->table('products')->where('id', $item['product']['id'])->exists() &&
+                    $db->table('variants')->where('id', $variant['id'])->exists()
+                ){
+
+                    $db->table('list_variants')->insert([
+                        'list_id' => $list_id,
+                        'variant_id' => $variant['id'],
+                        'product_id' => $item['product']['id'],
+                        'total' => $variant['total']
+                    ]);
+                }
+            
+            }
+        }
+        return respondWithJson($response, get_list_with_id($db, $list_id));
+    });
+
+    $group->delete('/list/{id:[0-9]+}', function (Request $request, Response $response, $args) {
+        $db = $this->get('db');
+        $s = $db->table('list')->where('id', $args['id'])->update(['is_deleted' => true]);
+        return respondWithJson($response, [], $s ? 200 : 500);
+    });
+   
 
     $group->post('/variant/create', function (Request $request, Response $response, $args) {
         $db = $this->get('db');
-        $data = $request->getParsedBody();
+        $data = parse_body($request);
 
         if(!isset($data['product_id']) || is_numeric(!$data['product_id'])){
             return respondWithJson($response, [ 'message' => 'Product id doğru değil.' ], 400);
@@ -223,14 +264,15 @@ $app->group('', function ($group)  {
 
     // update
     $group->post('/variant/{id:[0-9]+}', function (Request $request, Response $response, $args) {
-        $data = $request->getParsedBody();
+        $data = parse_body($request);
         if(!isset($data['title']) || !isset($data['stock']))
             return respondWithJson($response, [], 400);
-
-
         $db = $this->get('db');
-        $s = $db->table('variants')->where('id', $args['id'])->update(['title' => $data['title'], 'stock' => $data['stock'] ]);
-        return respondWithJson($response, [], $s ? 200 : 500);
+        $s = $db->table('variants')
+        ->where('id', $args['id'])
+        ->update(['title' => $data['title'],
+         'stock' => intval($data['stock']) ]);
+        return respondWithJson($response, [], 200);
     });
     $group->delete('/variant/{id:[0-9]+}', function (Request $request, Response $response, $args) {
         $db = $this->get('db');

@@ -59,5 +59,6 @@ function parse_body(Request $request){
     }else{
         $data = $request->getParsedBody();
     }
+
     return $data;
 }
